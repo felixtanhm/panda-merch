@@ -2,9 +2,15 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+
+	_ "github.com/denisenkom/go-mssqldb"
+	"github.com/joho/godotenv"
 )
 
 // Handler for the root route
@@ -24,12 +30,43 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	}
+}
 
+func initDB() error {
+	godotenv.Load()
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	connString := fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	fmt.Println("initDB")
+	DB, err := sql.Open("sqlserver", connString)
+	if err != nil {
+		fmt.Println("Error Open")
+		return err
+	}
+	defer DB.Close()
+
+	err = DB.Ping()
+	if err != nil {
+		fmt.Println("Error Ping")
+		return err
+	}
+
+	fmt.Println("Connected to MySQL database: ", dbName)
+	return nil
 }
 
 func main() {
-	http.HandleFunc("/", rootHandler)         // Route for "/"
-	http.HandleFunc("/api/data", dataHandler) // Route for "/api/data"
+	fmt.Println("running")
+	errInit := initDB()
+	if errInit != nil {
+		log.Fatalf("Error initializing database %v", errInit)
+	}
+	http.HandleFunc("/", rootHandler)      // Route for "/"
+	http.HandleFunc("/users", dataHandler) // Route for "/"
 
 	port := ":3000"
 	fmt.Printf("Server is running on http://localhost%s\n", port)
