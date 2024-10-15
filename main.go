@@ -32,8 +32,11 @@ func dataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initDB() error {
-	godotenv.Load()
+func initDB() (*sql.DB, error) {
+	err := godotenv.Load()
+	if err != nil {
+		return nil, fmt.Errorf("\nloading .env file error:\n %w", err)
+	}
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
 	dbHost := os.Getenv("DB_HOST")
@@ -41,37 +44,35 @@ func initDB() error {
 	dbName := os.Getenv("DB_NAME")
 	connString := fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=%s", dbUser, dbPassword, dbHost, dbPort, dbName)
 
-	fmt.Println("initDB")
 	DB, err := sql.Open("sqlserver", connString)
 	if err != nil {
-		fmt.Println("Error Open")
-		return err
+		return nil, fmt.Errorf("\nopening connection error:\n %w", err)
 	}
-	defer DB.Close()
-
 	err = DB.Ping()
 	if err != nil {
-		fmt.Println("Error Ping")
-		return err
+		DB.Close()
+		return nil, fmt.Errorf("\ndatabase pinging error:\n %w", err)
 	}
 
 	fmt.Println("Connected to MySQL database: ", dbName)
-	return nil
+	return DB, nil
 }
 
 func main() {
 	log.Println("Starting server...")
-	errInit := initDB()
-	if errInit != nil {
-		log.Fatalf("Error initializing database %v", errInit)
+
+	db, err := initDB()
+	if err != nil {
+		log.Fatalf("Database initialization error: %v", err)
 	}
+	defer db.Close()
 	http.HandleFunc("/", rootHandler)      // Route for "/"
 	http.HandleFunc("/users", dataHandler) // Route for "/"
 
 	port := ":3000"
 	log.Printf("Server is running on http://localhost%s\n", port)
-	err := http.ListenAndServe(port, nil) // Start the server
+	err = http.ListenAndServe(port, nil) // Start server
 	if err != nil {
-		fmt.Println("Error starting server:", err)
+		log.Fatalf("Error starting server: %v", err)
 	}
 }
