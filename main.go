@@ -60,7 +60,7 @@ func initDB() error {
 }
 
 func main() {
-	fmt.Println("running")
+	log.Println("Starting server...")
 	errInit := initDB()
 	if errInit != nil {
 		log.Fatalf("Error initializing database %v", errInit)
@@ -69,7 +69,7 @@ func main() {
 	http.HandleFunc("/users", dataHandler) // Route for "/"
 
 	port := ":3000"
-	fmt.Printf("Server is running on http://localhost%s\n", port)
+	log.Printf("Server is running on http://localhost%s\n", port)
 	err := http.ListenAndServe(port, nil) // Start the server
 	if err != nil {
 		fmt.Println("Error starting server:", err)
