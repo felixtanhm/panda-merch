@@ -69,9 +69,13 @@ func main() {
 	http.HandleFunc("/", rootHandler)      // Route for "/"
 	http.HandleFunc("/users", dataHandler) // Route for "/"
 
-	port := ":3000"
-	log.Printf("Server is running on http://localhost%s\n", port)
-	err = http.ListenAndServe(port, nil) // Start server
+	port := os.Getenv("PORT_NUMBER")
+	if port == "" {
+		log.Fatal("PORT_NUMBER environment variable is not set")
+	}
+	log.Printf("Server is running on http://localhost:%s\n", port)
+
+	err = http.ListenAndServe(":"+port, nil) // Start server
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
