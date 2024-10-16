@@ -67,9 +67,11 @@ func main() {
 		log.Fatalf("Database initialization error: %v", err)
 	}
 	defer db.Close()
+
+	app := &handlers.App{DB: db}
 	http.HandleFunc("/", rootHandler)      // Route for "/"
 	http.HandleFunc("/users", dataHandler) // Route for "/"
-	http.HandleFunc("/merch", handlers.MerchHandler)
+	http.HandleFunc("/merch", app.MerchHandler)
 
 	port := ":3000"
 	log.Printf("Server is running on http://localhost%s\n", port)
