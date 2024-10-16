@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"panda-merch/internal/handlers"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/joho/godotenv"
@@ -68,6 +69,7 @@ func main() {
 	defer db.Close()
 	http.HandleFunc("/", rootHandler)      // Route for "/"
 	http.HandleFunc("/users", dataHandler) // Route for "/"
+	http.HandleFunc("/merch", handlers.MerchHandler)
 
 	port := os.Getenv("PORT_NUMBER")
 	if port == "" {
