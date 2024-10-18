@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -19,20 +21,27 @@ type Merch struct {
 
 type Response struct {
 	CurPage    int     `json:"curPage"`
+	NextPage   int     `json:"nextPage"`
 	TotalItems int     `json:"totalItems"`
 	Merch      []Merch `json:"merch"`
 }
 
 func (app *App) MerchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	pageParam, err := validatePageParam(r.URL.Query().Get("page"))
+	if err != nil {
+		http.Error(w, "Invalid page parameter. Please provide a positive integer.", http.StatusInternalServerError)
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
-		merchList, err := app.fetchMerch()
+		merchList, err := app.fetchMerch(pageParam)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		response := Response{
-			CurPage:    1,
+			CurPage:    pageParam,
+			NextPage:   pageParam + 1,
 			TotalItems: len(merchList),
 			Merch:      merchList,
 		}
@@ -46,10 +55,9 @@ func (app *App) MerchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *App) fetchMerch() ([]Merch, error) {
+func (app *App) fetchMerch(page int) ([]Merch, error) {
 	merchList := []Merch{}
 	pageSize := 10
-	page := 1
 	offset := (page - 1) * pageSize
 	query := "SELECT id, name, price, availability, createdAt, modifiedAt FROM Merchandise ORDER BY id OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;"
 	rows, err := app.DB.Query(query, sql.Named("offset", offset), sql.Named("pageSize", pageSize))
@@ -75,4 +83,17 @@ func (app *App) fetchMerch() ([]Merch, error) {
 	}
 
 	return merchList, nil
+}
+
+func validatePageParam(param string) (int, error) {
+	if param == "" {
+		return 1, nil
+	}
+
+	page, err := strconv.Atoi(param)
+	if err != nil {
+		return 0, fmt.Errorf("PageParam Error: %v", err)
+	}
+
+	return page, nil
 }
