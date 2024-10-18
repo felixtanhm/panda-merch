@@ -22,27 +22,38 @@ type Merch struct {
 type Response struct {
 	CurPage    int     `json:"curPage"`
 	NextPage   int     `json:"nextPage"`
+	TotalPages int     `json:"totalPages"`
 	TotalItems int     `json:"totalItems"`
 	Merch      []Merch `json:"merch"`
 }
 
 func (app *App) MerchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	pageParam, err := validatePageParam(r.URL.Query().Get("page"))
+	pageParam, err := validatePageParam(r.URL.Query().Get("page"), 1)
 	if err != nil {
 		http.Error(w, "Invalid page parameter. Please provide a positive integer.", http.StatusInternalServerError)
 		return
 	}
+	pageSizeParam, err := validatePageParam(r.URL.Query().Get("pageSize"), 10)
+	if err != nil {
+		http.Error(w, "Invalid pageSize parameter. Please provide a positive integer.", http.StatusInternalServerError)
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
-		merchList, err := app.fetchMerch(pageParam)
+		merchList, err := app.fetchMerch(pageParam, pageSizeParam)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		totalPages, totalItems, err := app.fetchMetaData(pageSizeParam)
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		response := Response{
 			CurPage:    pageParam,
 			NextPage:   pageParam + 1,
-			TotalItems: len(merchList),
+			TotalPages: totalPages,
+			TotalItems: totalItems,
 			Merch:      merchList,
 		}
 
@@ -55,9 +66,8 @@ func (app *App) MerchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *App) fetchMerch(page int) ([]Merch, error) {
+func (app *App) fetchMerch(page int, pageSize int) ([]Merch, error) {
 	merchList := []Merch{}
-	pageSize := 10
 	offset := (page - 1) * pageSize
 	query := "SELECT id, name, price, availability, createdAt, modifiedAt FROM Merchandise ORDER BY id OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;"
 	rows, err := app.DB.Query(query, sql.Named("offset", offset), sql.Named("pageSize", pageSize))
@@ -85,9 +95,30 @@ func (app *App) fetchMerch(page int) ([]Merch, error) {
 	return merchList, nil
 }
 
-func validatePageParam(param string) (int, error) {
+func (app *App) fetchMetaData(pageSize int) (int, int, error) { // returns totalPages and totalItems
+	totalItemsQuery := "SELECT COUNT(*) FROM Merchandise"
+	rows, err := app.DB.Query(totalItemsQuery)
+	if err != nil {
+		log.Printf("Database query error: %v", err)
+		return 0, 0, err
+	}
+	defer rows.Close()
+
+	var totalItems int
+	if rows.Next() {
+		err := rows.Scan(&totalItems)
+		if err != nil {
+			log.Printf("Row scanning error: %v", err)
+			return 0, 0, err
+		}
+	}
+	totalPages := (totalItems / pageSize) + 1
+	return totalPages, totalItems, nil
+}
+
+func validatePageParam(param string, defaultValue int) (int, error) {
 	if param == "" {
-		return 1, nil
+		return defaultValue, nil
 	}
 
 	page, err := strconv.Atoi(param)
